@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador de Flashcards para Niños con Autismo</title>
+  <style>
+    :root {
+      --primary: #3498db;
+      --secondary: #2980b9;
+      --error: #e74c3c;
+      --background: #f9f9f9;
+      --card-bg: #ffffff;
+    }
+    body {
+      font-family: 'Arial', sans-serif;
+      background: var(--background);
+      padding: 20px;
+      text-align: center;
+      color: #333;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 30px;
+    }
+    textarea {
+      width: 90%;
+      max-width: 600px;
+      height: 120px;
+      margin: 20px 0;
+      padding: 15px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: 2px solid var(--primary);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: border 0.3s ease;
+    }
+    textarea:focus {
+      border-color: var(--secondary);
+      outline: none;
+    }
+    button {
+      padding: 12px 25px;
+      font-size: 16px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      margin-bottom: 20px;
+    }
+    button:hover {
+      background-color: var(--secondary);
+    }
+    button:disabled {
+      background-color: #95a5a6;
+      cursor: not-allowed;
+    }
+    .flashcard {
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 15px auto;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      max-width: 600px;
+      text-align: left;
+      border-left: 5px solid var(--primary);
+      transition: transform 0.3s ease;
+    }
+    .flashcard:hover {
+      transform: translateY(-5px);
+    }
+    .flashcard h3 {
+      color: #2c3e50;
+      margin-top: 0;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
+    .flashcard p {
+      margin: 10px 0;
+    }
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0,0,0,0.1);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .error-message {
+      color: var(--error);
+      padding: 10px;
+      background: #fadbd8;
+      border-radius: 5px;
+      margin: 20px auto;
+      max-width: 600px;
+    }
+    .topic-examples {
+      font-size: 14px;
+      color: #7f8c8d;
+      margin-top: -15px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌟 Generador de Flashcards Educativas</h1>
+    <p>Crea tarjetas de aprendizaje personalizadas para niños con autismo</p>
+    <p class="topic-examples">Ejemplos: animales de la granja, emociones básicas, colores, formas geométricas</p>
+    
+    <textarea id="inputText" placeholder="Escribe aquí el tema de las flashcards..."></textarea><br>
+    <button id="generateBtn" onclick="generateFlashcards()">Generar Flashcards</button>
+    
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const generateBtn = document.getElementById("generateBtn");
+    const resultDiv = document.getElementById("result");
+    const inputText = document.getElementById("inputText");
+
+    inputText.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        generateFlashcards();
+      }
+    });
+
+    async function generateFlashcards() {
+      const text = inputText.value.trim();
+      
+      if (!text) {
+        showError("Por favor escribe un tema para las flashcards.");
+        return;
+      }
+
+      generateBtn.disabled = true;
+      resultDiv.innerHTML = '<div class="loading"></div><span>Generando flashcards...</span>';
+
+      try {
+        const response = await fetch("http://127.0.0.1:5000/generate", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({ text })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showError(data.error || "Error al generar las flashcards. Intenta con otro tema.");
+          return;
+        }
+
+        displayFlashcards(data.flashcards || data.response || data);
+        
+      } catch (error) {
+        showError("No se pudo conectar con el servidor. Verifica tu conexión.");
+        console.error("Error:", error);
+      } finally {
+        generateBtn.disabled = false;
+      }
+    }
+
+    function displayFlashcards(flashcardsData) {
+      resultDiv.innerHTML = "";
+
+      try {
+        let cards;
+        
+        if (typeof flashcardsData === "string") {
+          try {
+            cards = JSON.parse(flashcardsData).flashcards;
+          } catch {
+            const cardDiv = document.createElement("div");
+            cardDiv.className = "flashcard";
+            cardDiv.innerHTML = `<p>${flashcardsData}</p>`;
+            resultDiv.appendChild(cardDiv);
+            return;
+          }
+        } else if (Array.isArray(flashcardsData)) {
+          cards = flashcardsData;
+        } else if (flashcardsData.flashcards) {
+          cards = flashcardsData.flashcards;
+        } else {
+          cards = [flashcardsData];
+        }
+
+        if (!cards || cards.length === 0) {
+          showError("No se generaron flashcards. Intenta con una descripción más clara.");
+          return;
+        }
+
+        cards.forEach((card, index) => {
+          const cardDiv = document.createElement("div");
+          cardDiv.className = "flashcard";
+          const pregunta = card.pregunta || card.question || `Pregunta ${index + 1}`;
+          const respuesta = card.respuesta || card.answer || card.response || "Respuesta no disponible";
+          
+          cardDiv.innerHTML = `
+            <h3>Flashcard ${index + 1}</h3>
+            <p><strong>Pregunta:</strong> ${pregunta}</p>
+            <p><strong>Respuesta:</strong> ${respuesta}</p>
+          `;
+          resultDiv.appendChild(cardDiv);
+        });
+
+      } catch (e) {
+        showError("Error al procesar las flashcards generadas.");
+        console.error("Error parsing:", e);
+      }
+    }
+
+    function showError(message) {
+      resultDiv.innerHTML = `<div class="error-message">${message}</div>`;
+    }
+  </script>
+</body>
+</html>
